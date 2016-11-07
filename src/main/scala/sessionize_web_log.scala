@@ -15,6 +15,7 @@ object sessionize_web_log{
 	
     //the data is stored in "hdfs://localhost:8020/user/paytmlabs/2015_07_22_mktplace_shop_web_log_sample.log"
     val file_name = "hdfs://localhost:8020/user/paytmlabs/2015_07_22_mktplace_shop_web_log_sample.log"
+    
 
     //A function to parse each log entry
     def parse_log_entry(log: String) = {
@@ -58,9 +59,9 @@ object sessionize_web_log{
         val date_time = timestamp.substring(0,date_end)+"-"+timestamp.substring(date_end+1,time_end)
         //define the SimpleDateFormat pattern for parsing date_time
         val date_time_format = new java.text.SimpleDateFormat("yyyy-MM-dd-HH:mm:ss")
-        //return a value representing minutes since the reference time
-        val minutes_from_reference = date_time_format.parse(date_time).getTime()/1000 
-	minutes_from_reference.toLong
+        //return a value representing seconds since the reference time
+        val seconds_from_reference = date_time_format.parse(date_time).getTime()/1000 
+	seconds_from_reference.toLong
     }
 
     //a function to extract the URL from the request
@@ -69,9 +70,9 @@ object sessionize_web_log{
 	request.split("\\s+")(1)
     }
 
-    //a function used for determining the start time of each session, assuming an inactivity threshold of 15 minutes
+    //a function used for determining the start time of each session
     //the function accepts a key value pair where the key is the unique IP and the value is an iterable of (time_in_seconds, url)
-    def determine_session_start(ip_time_Url: (String, Iterable[(Long, String)])) = {
+    def determine_session_start(ip_time_Url: (String, Iterable[(Long, String)]), inactivity_threshold: Int) = {
 
 	val ip = ip_time_Url._1
 
@@ -84,11 +85,11 @@ object sessionize_web_log{
         var session_start_time = time_Url(0)._1
 	var ip_time_startTime_Url: List[(String, Long, Long, String)] = List((ip, time_Url(0)._1, session_start_time, time_Url(0)._2))        
 
-        //go through the list of log entries to add the session_start_time
+        //go through the list of log entries to add the session_start_time field
 	var i = 0        
 	for (i <- 1 to ctr - 1){
 		//a new session_start_time is indicated when two successive entries are separated by over the inactivity threshold
-		if(time_Url(i)._1 - time_Url(i-1)._1 > 15*60){
+		if(time_Url(i)._1 - time_Url(i-1)._1 > inactivity_threshold*60){
 			session_start_time = time_Url(i)._1		
 		}
 		ip_time_startTime_Url = ip_time_startTime_Url ++ List((ip, time_Url(i)._1, session_start_time, time_Url(i)._2))
@@ -107,7 +108,8 @@ object sessionize_web_log{
 
     //determine the session start time for each log entry using the function determine_session_start
     //add the session start time as a new field to ip_time_Url
-    val ip_time_session_Url = ip_time_Url.groupByKey.flatMap(log => determine_session_start(log))
+    val inactivity_threshold = 35
+    val ip_time_session_Url = ip_time_Url.groupByKey.flatMap(log => determine_session_start(log, inactivity_threshold))
 
     //aggregate all page hits by the key (IP, session)
     val ip_session_Url = ip_time_session_Url.map(log => ((log._1, log._3), log._4)).groupByKey
@@ -115,17 +117,17 @@ object sessionize_web_log{
 
 
     //find session duration (Note the session field is the start time of the session)
-    //assuming the minimum session duration is 1 minute
-    val ip_session_duration = ip_time_session_Url.map(log => ((log._1, log._3), Math.max(60, log._2 - log._3))).reduceByKey((x,y) => Math.max(x, y))
-
-    //find average session duration per user
-    val ip_avg_duration = ip_session_duration.map(log => (log._1._1, (log._2, 1) )).reduceByKey((x,y) => (x._1 + y._1, x._2 + y._2)).map(kv => (kv._1, kv._2._1.toDouble/kv._2._2/60))
+    val ip_session_duration = ip_time_session_Url.map(log => ((log._1, log._3), log._2 - log._3)).reduceByKey((x,y) => Math.max(x,y))    
+    
+    //find average session duration per user 
+    val ip_session_duration_filtered = ip_session_duration.filter(log => log._2 > 0)  //filter out sessions with only 1 hit (i.e. not enough information to determine duration)
+    val ip_avg_duration = ip_session_duration_filtered.map(log => (log._1._1, (log._2, 1) )).reduceByKey((x,y) => (x._1 + y._1, x._2 + y._2)).map(kv => (kv._1, kv._2._1.toDouble/kv._2._2/60))
     ip_avg_duration.saveAsTextFile("hdfs://localhost:8020/user/paytmlabs/average_duration_per_user_output")
 
     //find the average duration of all sessions
-    val sum_count_duration = ip_session_duration.map(log => (log._2, 1)).reduce((x,y) => (x._1 + y._1, x._2 + y._2))
+    val sum_count_duration = ip_session_duration_filtered.map(log => (log._2, 1)).reduce((x,y) => (x._1 + y._1, x._2 + y._2))
     val avg_duration = sum_count_duration._1.toDouble/sum_count_duration._2/60
-    println("The average session time is: " + avg_duration + "mins")
+    println("The average session time is: " + avg_duration + " min")
 
     //determine the number of unique URL hits for each session
     val ip_session_uniqueUrl = ip_time_session_Url.map(log => ((log._1, log._3), log._4)).groupByKey.map(log => (log._1, log._2.toSet.size))
@@ -135,7 +137,13 @@ object sessionize_web_log{
     val longest_session = ip_session_duration.reduce((x,y) => {if(x._2 >= y._2){x}
 							   else{y}})
     val most_engaged_user=longest_session._1._1
-    println("The IP address of the most engaged user is: " + most_engaged_user + " with session time of "+ longest_session._2/60 + " mins")
+    println("The IP address of the most engaged user is: " + most_engaged_user + " with session time of "+ longest_session._2/60 + " min")
+
+    //Alternatively, find the top 3 most engaged users
+    val ip_longest_duration = ip_session_duration.map(log => (log._1._1, log._2)).reduceByKey((x,y) => Math.max(x,y))
+    val ip_duration_sorted = ip_longest_duration.map(log => (log._2, log._1)).sortByKey(false)
+    println("The IP address of the top 3 most engaged users are: ")
+    ip_duration_sorted.map(log => log._2 + " (" + log._1/60 + " min)").take(3).foreach(println) 
   }
 }
 

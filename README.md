@@ -10,7 +10,7 @@ The solution program will:
 
 The solution also made the following assumptions:
 
-1. The inactivity threshold (ie, time span between two hits to be considered as different sessions) is 35 minutes.  This threshold is selected based on Fig. 1, which is a plot of frequency vs. time interval between successive page hits.
+* The inactivity threshold (ie, time span between two hits to be considered as different sessions) is 35 minutes.  This threshold is selected based on Fig. 1, which is a plot of frequency vs. time interval between successive page hits.
 
 <p align="center">
   <img src="/images/interval_length.png" >
@@ -18,7 +18,7 @@ The solution also made the following assumptions:
 *Fig. 1. Frequency vs. time interval between successive page hits.* 
 
 
-2. To calculate the average session time, the sessions with only one page hit were ignored because there was not enough information to determine the length of time the user stayed on the page.  
+* To calculate the average session time, the sessions with only one page hit were ignored because there was not enough information to determine the length of time the user stayed on the page.  
 
 An example log entry has the following format:
 

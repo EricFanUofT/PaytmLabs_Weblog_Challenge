@@ -6,12 +6,19 @@ The solution program will:
 1. aggregate URLs of all page hits by distinct users (ie, IPs) for each session
 2. determine the average session time
 3. determine the number of unique URL visits per session
-4. find the most engaged user (with the longest session time)
+4. find the most engaged users (with the longest session time)
 
 The solution also made the following assumptions:
 
-1. The inactivity threshold (ie, time span between two hits to be considered as different sessions) is 15 minutes
-2. The minimum session time is 1 minute (ie, if the user only visited 1 page, the time spent for that session is assumed to be 1 minute when calculating the average session time (2 above))
+1. The inactivity threshold (ie, time span between two hits to be considered as different sessions) is 35 minutes.  This threshold is selected based on Fig. 1, which is a plot of frequency vs. time interval between successive page hits.
+
+<p align="center">
+  <img src="/images/interval length.png" >
+</p>
+*Fig. 1. Frequency vs. time interval between successive page hits.* 
+
+
+2. To calculate the average session time, the sessions with only one page hit were ignored because there was not enough information to determine the length of time the user stayed on the page.  
 
 An example log entry has the following format:
 
@@ -19,4 +26,4 @@ An example log entry has the following format:
 
 
 
-(For the test data provided, the answers to 2 and 4 are 2.21 mins and 106.186.23.95 (with session time of 34 mins), respectively)
+(For the test data provided, the answers to 2 and 4 are 3.68 mins and 220.226.206.7 (with session time of 54 mins), respectively)

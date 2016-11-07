@@ -13,7 +13,7 @@ The solution also made the following assumptions:
 1. The inactivity threshold (ie, time span between two hits to be considered as different sessions) is 35 minutes.  This threshold is selected based on Fig. 1, which is a plot of frequency vs. time interval between successive page hits.
 
 <p align="center">
-  <img src="/images/interval length.png" >
+  <img src="/images/interval_length.png" >
 </p>
 *Fig. 1. Frequency vs. time interval between successive page hits.* 
 
